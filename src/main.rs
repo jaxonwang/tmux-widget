@@ -47,7 +47,7 @@ fn network_bandwidth(cfg: &Config) -> String {
 }
 
 // will try best to fix the value into max_width
-fn max_width_float(v: f64, max_width: usize) -> String {
+fn max_width_float(v: f64, max_width: usize, remove_trail: bool) -> String {
     let precision = max_width;
     let value = format!("{:.*}", precision, v);
     // remove trailing zeros, then remove trailing dot
@@ -60,7 +60,9 @@ fn max_width_float(v: f64, max_width: usize) -> String {
         return integer.to_string();
     }
     let mut value_str = &value[..max_width]; // get prefix to fix width
-    value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
+    if remove_trail {
+        value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
+    }
     return value_str.to_string();
 }
 
@@ -75,7 +77,7 @@ fn pretty_size(s: u64, fix_length: bool, max_width: usize) -> String {
     };
     let value_str = if fix_length {
         let value_max_width = max_width - 2;
-        max_width_float(value, value_max_width)
+        max_width_float(value, value_max_width, true)
     } else {
         format!("{:2}", value)
     };
@@ -117,7 +119,7 @@ fn cpu(cfg: &Config) -> String {
         processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
 
     let cpu_show = if cfg.with_icons { " " } else { "CPU: " };
-    format!("{cpu_show}{:>4}", max_width_float(cpu_usage_avg as f64, 4))
+    format!("{cpu_show}{:>4}", max_width_float(cpu_usage_avg as f64, 4, false))
 }
 
 #[derive(Clone)]
