@@ -10,10 +10,10 @@ cargo build --release
 
 Print network bandwidth
 ```
-tmux-widget --net --with-icons --interval=1
+./target/release/tmux-widget --net --with-icons --interval 1
 ```
 
 Print CPU and memory usage
 ```
-tmux-widget --cpu-mem --with-icons
+./target/release/tmux-widget --cpu-mem --with-icons
 ```

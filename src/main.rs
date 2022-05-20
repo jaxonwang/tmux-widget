@@ -27,14 +27,14 @@ fn network_bytes() -> (u64, u64) {
     (received, sent)
 }
 
-fn network_bandwidth(interval: time::Duration, with_icon: bool) {
+fn network_bandwidth(interval: time::Duration, with_icons: bool) {
     let (first_up, first_down) = network_bytes();
     std::thread::sleep(interval);
     let (second_up, second_down) = network_bytes();
     let seconds = interval.as_secs();
     let up_bandwidth = second_up.wrapping_sub(first_up) / seconds;
     let down_bandwidth = second_down.wrapping_sub(first_down) / seconds;
-    let (up_name, done_name) = if with_icon {
+    let (up_name, done_name) = if with_icons {
         (" ", " ")
     } else {
         ("UP: ", "DOWN: ")
@@ -62,7 +62,7 @@ fn pretty_size(s: u64) -> String {
     format!("{}{}", value, unit)
 }
 
-fn cpu_mem(with_icon: bool) {
+fn cpu_mem(with_icons: bool) {
     let refresh = RefreshKind::new().with_cpu().with_memory();
     let system = System::new_with_specifics(refresh);
     let processors = system.processors();
@@ -74,7 +74,7 @@ fn cpu_mem(with_icon: bool) {
     let total_swap = system.total_swap() * 1024;
     let used_swap = system.used_swap() * 1024;
 
-    let (cpu_show, memory_show, swap_show) = if with_icon {
+    let (cpu_show, memory_show, swap_show) = if with_icons {
         (" ", " ", "易")
     } else {
         ("CPU: ", "MEM: ", "SWP: ")
@@ -95,7 +95,7 @@ fn main() {
     }
     let mut do_net = false;
     let mut do_cpu_men = false;
-    let mut with_icon = false;
+    let mut with_icons = false;
     let mut interval = time::Duration::from_secs(1);
 
     let mut args_iter = std::env::args().skip(1);
@@ -103,7 +103,7 @@ fn main() {
         match arg.as_str() {
             "--net" => do_net = true,
             "--cpu-mem" => do_cpu_men = true,
-            "--with-icon" => with_icon = true,
+            "--with-icons" => with_icons = true,
             "--interval" => {
                 let interval_sec = args_iter
                     .next()
@@ -114,13 +114,14 @@ fn main() {
             }
             _ => {
                 eprintln! {"unknown option: {}", arg}
+                process::exit(1);
             }
         }
     }
     if do_net {
-        network_bandwidth(interval, with_icon);
+        network_bandwidth(interval, with_icons);
     }
     if do_cpu_men {
-        cpu_mem(with_icon);
+        cpu_mem(with_icons);
     }
 }
