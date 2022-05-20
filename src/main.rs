@@ -1,4 +1,5 @@
 use std::process;
+use std::thread;
 use std::time;
 use sysinfo::{NetworkExt, NetworksExt, ProcessorExt, RefreshKind, System, SystemExt};
 
@@ -24,68 +25,109 @@ fn network_bytes() -> (u64, u64) {
         .map(|(_, n)| n.total_transmitted())
         .sum();
 
-    (received, sent)
+    (sent, received)
 }
 
-fn network_bandwidth(interval: time::Duration, with_icons: bool) {
+fn network_bandwidth(cfg: &Config) -> String {
     let (first_up, first_down) = network_bytes();
-    std::thread::sleep(interval);
+    thread::sleep(cfg.interval);
     let (second_up, second_down) = network_bytes();
-    let seconds = interval.as_secs();
+    let seconds = cfg.interval.as_secs();
     let up_bandwidth = second_up.wrapping_sub(first_up) / seconds;
     let down_bandwidth = second_down.wrapping_sub(first_down) / seconds;
-    let (up_name, done_name) = if with_icons {
+    let (up_name, done_name) = if cfg.with_icons {
         (" ", " ")
     } else {
         ("UP: ", "DOWN: ")
     };
-    println!(
-        "{up_name}{}/s  {done_name}{}/s",
-        pretty_size(up_bandwidth),
-        pretty_size(down_bandwidth)
-    )
+    let width = 6;
+    let up_bandwidth = pretty_size(up_bandwidth, cfg.fix_length, width);
+    let down_bandwidth = pretty_size(down_bandwidth, cfg.fix_length, width);
+    format!("{up_name}{up_bandwidth:>width$}/s {done_name}{down_bandwidth:>width$}/s",)
 }
 
 // accept bytes show string
-fn pretty_size(s: u64) -> String {
+// will try best to fix the value and unit into max_width
+fn pretty_size(s: u64, fix_length: bool, max_width: usize) -> String {
     let (value, unit) = match s {
-        s if s < 1024 => (s as f64, "B"),
-        s if s < 1024 * 1024 => (s as f64 / 1024.0, "KB"),
-        s if s < 1024 * 1024 * 1024 => (s as f64 / 1024.0 / 1024.0, "MB"),
-        s if s < 1024 * 1024 * 1024 * 1024 => (s as f64 / 1024.0 / 1024.0 / 1024.0, "GB"),
+        s if s < 1000 => (s as f64, "B"),
+        s if s < 1000 * 1024 => (s as f64 / 1024.0, "KB"),
+        s if s < 1000 * 1024 * 1024 => (s as f64 / 1024.0 / 1024.0, "MB"),
+        s if s < 1000 * 1024 * 1024 * 1024 => (s as f64 / 1024.0 / 1024.0 / 1024.0, "GB"),
         _ => (s as f64 / 1024.0 / 1024.0 / 1024.0 / 1024.0, "TB"),
     };
-    // precision: 3
-    let value = format!("{:.2}", value);
+    let value_max_width = max_width - 2;
+    let precision = value_max_width;
+    let value = format!("{:.*}", precision, value);
     // remove trailing zeros, then remove trailing dot
-    let value = value.trim_end_matches('0').trim_end_matches('.');
-    format!("{}{}", value, unit)
+
+    let valuesplit = value.split('.').collect::<Vec<_>>();
+    let integer = valuesplit[0];
+    let decimal = valuesplit[1];
+    if !fix_length{
+        return format!("{integer}.{}", &decimal[..precision]);
+    }
+    // too large, keep integer only
+    if integer.len() + 1 >= value_max_width{ // 1 is for decimal dot
+        return integer.to_string();
+    }
+    let mut value_str = &value[..value_max_width]; // get prefix to fix width
+    value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
+    format!("{}{}", value_str, unit)
 }
 
-fn cpu_mem(with_icons: bool) {
-    let refresh = RefreshKind::new().with_cpu().with_memory();
+fn mem(cfg: &Config) -> String {
+    let refresh = RefreshKind::new().with_memory();
     let system = System::new_with_specifics(refresh);
-    let processors = system.processors();
-    let processor_num = processors.len();
-    let cpu_usage_avg: f32 =
-        processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
     let total_mem = system.total_memory() * 1024;
     let used_mem = system.used_memory() * 1024;
     let total_swap = system.total_swap() * 1024;
     let used_swap = system.used_swap() * 1024;
 
-    let (cpu_show, memory_show, swap_show) = if with_icons {
-        (" ", " ", "易")
+    let (memory_show, swap_show) = if cfg.with_icons {
+        (" ", "易")
     } else {
-        ("CPU: ", "MEM: ", "SWP: ")
+        ("MEM: ", "SWP: ")
     };
-    println!(
-        "{cpu_show}{cpu_usage_avg:.2} {memory_show}{}/{} {swap_show}{}/{}",
-        pretty_size(used_mem),
-        pretty_size(total_mem),
-        pretty_size(used_swap),
-        pretty_size(total_swap)
-    );
+    let width = 6;
+    format!(
+        "{memory_show}{:>width$}/{:>width$} {swap_show}{:>width$}/{:>width$}",
+        pretty_size(used_mem, cfg.fix_length, width),
+        pretty_size(total_mem, cfg.fix_length, width),
+        pretty_size(used_swap, cfg.fix_length, width),
+        pretty_size(total_swap, cfg.fix_length, width)
+    )
+}
+
+fn cpu(cfg: &Config) -> String {
+    let refresh = RefreshKind::new().with_cpu();
+    let mut system = System::new_with_specifics(refresh);
+    thread::sleep(cfg.interval);
+    system.refresh_cpu();
+    let processors = system.processors();
+    let processor_num = processors.len();
+    let cpu_usage_avg: f32 =
+        processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
+
+    let cpu_show = if cfg.with_icons { " " } else { "CPU: " };
+    format!("{cpu_show}{cpu_usage_avg:.2}")
+}
+
+#[derive(Clone)]
+struct Config {
+    with_icons: bool,
+    interval: time::Duration,
+    fix_length: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            with_icons: false,
+            interval: time::Duration::from_secs(1),
+            fix_length: true,
+        }
+    }
 }
 
 fn main() {
@@ -93,24 +135,25 @@ fn main() {
         eprintln!("This OS is not supported!");
         process::exit(1);
     }
-    let mut do_net = false;
-    let mut do_cpu_men = false;
-    let mut with_icons = false;
-    let mut interval = time::Duration::from_secs(1);
+
+    let mut cfg: Config = Default::default();
+    let mut ops = Vec::<fn(&Config) -> String>::new();
 
     let mut args_iter = std::env::args().skip(1);
     while let Some(arg) = args_iter.next() {
         match arg.as_str() {
-            "--net" => do_net = true,
-            "--cpu-mem" => do_cpu_men = true,
-            "--with-icons" => with_icons = true,
+            "--net" => ops.push(network_bandwidth),
+            "--cpu" => ops.push(cpu),
+            "--mem" => ops.push(mem),
+            "--with-icons" => cfg.with_icons = true,
+            "--no-fix-length" => cfg.fix_length = false,
             "--interval" => {
                 let interval_sec = args_iter
                     .next()
                     .expect("missing value for interval")
                     .parse::<u64>()
                     .expect("bad interval");
-                interval = time::Duration::from_secs(interval_sec);
+                cfg.interval = time::Duration::from_secs(interval_sec);
             }
             _ => {
                 eprintln! {"unknown option: {}", arg}
@@ -118,10 +161,18 @@ fn main() {
             }
         }
     }
-    if do_net {
-        network_bandwidth(interval, with_icons);
+
+    let mut threads = vec![];
+    let mut outputs = vec![];
+    for (i, op) in ops.into_iter().enumerate() {
+        let localcfg = cfg.clone();
+        threads.push(thread::spawn(move || (i, op(&localcfg))));
     }
-    if do_cpu_men {
-        cpu_mem(with_icons);
-    }
+
+    threads
+        .into_iter()
+        .for_each(|t| outputs.push(t.join().unwrap()));
+    outputs.sort_by_key(|(i, _)| *i);
+    let outputs: Vec<String> = outputs.into_iter().map(|(_, s)| s).collect();
+    println!("{}", outputs.join(" "));
 }
