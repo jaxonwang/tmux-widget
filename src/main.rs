@@ -46,8 +46,25 @@ fn network_bandwidth(cfg: &Config) -> String {
     format!("{up_name}{up_bandwidth:>width$}/s {done_name}{down_bandwidth:>width$}/s",)
 }
 
+// will try best to fix the value into max_width
+fn max_width_float(v: f64, max_width: usize) -> String {
+    let precision = max_width;
+    let value = format!("{:.*}", precision, v);
+    // remove trailing zeros, then remove trailing dot
+
+    let valuesplit = value.split('.').collect::<Vec<_>>();
+    let integer = valuesplit[0];
+    // too large, keep integer only
+    if integer.len() + 1 >= max_width {
+        // 1 is for decimal dot
+        return integer.to_string();
+    }
+    let mut value_str = &value[..max_width]; // get prefix to fix width
+    value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
+    return value_str.to_string();
+}
+
 // accept bytes show string
-// will try best to fix the value and unit into max_width
 fn pretty_size(s: u64, fix_length: bool, max_width: usize) -> String {
     let (value, unit) = match s {
         s if s < 1000 => (s as f64, "B"),
@@ -56,24 +73,14 @@ fn pretty_size(s: u64, fix_length: bool, max_width: usize) -> String {
         s if s < 1000 * 1024 * 1024 * 1024 => (s as f64 / 1024.0 / 1024.0 / 1024.0, "GB"),
         _ => (s as f64 / 1024.0 / 1024.0 / 1024.0 / 1024.0, "TB"),
     };
-    let value_max_width = max_width - 2;
-    let precision = value_max_width;
-    let value = format!("{:.*}", precision, value);
-    // remove trailing zeros, then remove trailing dot
+    let value_str = if fix_length {
+        let value_max_width = max_width - 2;
+        max_width_float(value, value_max_width)
+    } else {
+        format!("{:2}", value)
+    };
 
-    let valuesplit = value.split('.').collect::<Vec<_>>();
-    let integer = valuesplit[0];
-    let decimal = valuesplit[1];
-    if !fix_length{
-        return format!("{integer}.{}", &decimal[..precision]);
-    }
-    // too large, keep integer only
-    if integer.len() + 1 >= value_max_width{ // 1 is for decimal dot
-        return integer.to_string();
-    }
-    let mut value_str = &value[..value_max_width]; // get prefix to fix width
-    value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
-    format!("{}{}", value_str, unit)
+    format!("{value_str}{unit}")
 }
 
 fn mem(cfg: &Config) -> String {
@@ -110,7 +117,7 @@ fn cpu(cfg: &Config) -> String {
         processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
 
     let cpu_show = if cfg.with_icons { " " } else { "CPU: " };
-    format!("{cpu_show}{cpu_usage_avg:.2}")
+    format!("{cpu_show}{:>4}", max_width_float(cpu_usage_avg as f64, 4))
 }
 
 #[derive(Clone)]
