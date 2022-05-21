@@ -105,8 +105,9 @@ fn mem(cfg: &Config) -> String {
         ("MEM: ", "SWP: ")
     };
     let width = 6;
+    // total mem/swp is fixed no need fill width
     format!(
-        "{memory_show}{:>width$}/{:>width$} {swap_show}{:>width$}/{:>width$}",
+        "{memory_show}{:>width$}/{} {swap_show}{:>width$}/{}",
         pretty_size(used_mem, cfg.fix_length, width),
         pretty_size(total_mem, cfg.fix_length, width),
         pretty_size(used_swap, cfg.fix_length, width),
