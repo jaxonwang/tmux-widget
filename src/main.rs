@@ -57,13 +57,19 @@ fn max_width_float(v: f64, max_width: usize, remove_trail: bool) -> String {
     // too large, keep integer only
     if integer.len() + 1 >= max_width {
         // 1 is for decimal dot
-        return integer.to_string();
+        return format!("{v:.*}", 0);
     }
-    let mut value_str = &value[..max_width]; // get prefix to fix width
+    // get round to fix width
+    let value = format!("{v:.*}", max_width - integer.len() - 1);
     if remove_trail {
-        value_str = value_str.trim_end_matches('0').trim_end_matches('.'); // remove trailing zeros then dot
+        // remove trailing zeros then dot
+        value
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    } else {
+        value
     }
-    return value_str.to_string();
 }
 
 // accept bytes show string
@@ -119,7 +125,10 @@ fn cpu(cfg: &Config) -> String {
         processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
 
     let cpu_show = if cfg.with_icons { " " } else { "CPU: " };
-    format!("{cpu_show}{:>4}", max_width_float(cpu_usage_avg as f64, 4, false))
+    format!(
+        "{cpu_show}{:>4}",
+        max_width_float(cpu_usage_avg as f64, 4, false)
+    )
 }
 
 #[derive(Clone)]
@@ -184,4 +193,28 @@ fn main() {
     outputs.sort_by_key(|(i, _)| *i);
     let outputs: Vec<String> = outputs.into_iter().map(|(_, s)| s).collect();
     println!("{}", outputs.join(" "));
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_pretty_size() {
+        let test_size_fixed_length_width_6 =
+            |s: u64, expected: &str| assert_eq!(pretty_size(s, true, 7), expected);
+
+        test_size_fixed_length_width_6(999, "999B");
+        test_size_fixed_length_width_6(1000, "0.977KB");
+        test_size_fixed_length_width_6(1024, "1KB");
+        test_size_fixed_length_width_6(2 * 1024, "2KB");
+        test_size_fixed_length_width_6(999 * 1024 - 10, "999KB");
+        test_size_fixed_length_width_6(1 * 1000 * 1024, "0.977MB");
+        test_size_fixed_length_width_6(1 * 1024 * 1024, "1MB");
+        test_size_fixed_length_width_6(1 * 1000 * 1024 * 1024, "0.977GB");
+        test_size_fixed_length_width_6(1 * 1024 * 1024 * 1024, "1GB");
+        test_size_fixed_length_width_6(1 * 1000 * 1024 * 1024 * 1024, "0.977TB");
+        test_size_fixed_length_width_6(1 * 1024 * 1024 * 1024 * 1024, "1TB");
+    }
 }
