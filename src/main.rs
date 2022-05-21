@@ -4,7 +4,7 @@ use std::time;
 use sysinfo::{NetworkExt, NetworksExt, ProcessorExt, RefreshKind, System, SystemExt};
 
 fn network_bytes() -> (u64, u64) {
-    let refresh = RefreshKind::new().with_networks();
+    let refresh = RefreshKind::new().with_networks().with_networks_list();
     let system = System::new_with_specifics(refresh);
 
     let networkref = system.networks();
