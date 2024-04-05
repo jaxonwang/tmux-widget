@@ -100,7 +100,7 @@ fn mem(cfg: &Config) -> String {
     let used_swap = system.used_swap() * 1024;
 
     let (memory_show, swap_show) = if cfg.with_icons {
-        (" ", "易")
+        ("󰍛 ", "󰣁 ")
     } else {
         ("MEM: ", "SWP: ")
     };
@@ -125,7 +125,7 @@ fn cpu(cfg: &Config) -> String {
     let cpu_usage_avg: f32 =
         processors.iter().map(|p| p.cpu_usage()).sum::<f32>() / processor_num as f32;
 
-    let cpu_show = if cfg.with_icons { " " } else { "CPU: " };
+    let cpu_show = if cfg.with_icons { "󰻠 " } else { "CPU: " };
     format!(
         "{cpu_show}{:>4}",
         max_width_float(cpu_usage_avg as f64, 4, false)
